@@ -28,14 +28,22 @@ class ViewController: UIViewController {
     }
 
     @IBAction func pressedAddEarth(_ sender: Any) {
+        
+        guard let pointOfView = sceneView.pointOfView else {return}
+        let transform = pointOfView.transform
+        let orientation = SCNVector3(-transform.m31, -transform.m32, -transform.m33)
+        let location = SCNVector3(transform.m41, transform.m42, transform.m43)
+        let currentPositionOfCamera = orientation + location
+        let earthLocation = currentPositionOfCamera + orientation
+        
         let earth = SCNNode()
         earth.geometry = SCNSphere(radius: earthRadiusKm * scale)
         earth.geometry?.firstMaterial?.diffuse.contents = #imageLiteral(resourceName: "earth_daymap")
         earth.geometry?.firstMaterial?.specular.contents = #imageLiteral(resourceName: "earth_specular_map")
         earth.geometry?.firstMaterial?.emission.contents = #imageLiteral(resourceName: "earth_clouds")
         earth.geometry?.firstMaterial?.normal.contents = #imageLiteral(resourceName: "earth_elevation_normal_map")
-        
-        earth.position = SCNVector3(0, 0, -0.5)
+        earth.position = earthLocation
+        earth.physicsBody = SCNPhysicsBody.static()
         sceneView.scene.rootNode.addChildNode(earth)
         let earthRotationAction = SCNAction.rotateBy(x: 0,
                                                      y: CGFloat(360.degreesToRadians),
@@ -43,9 +51,41 @@ class ViewController: UIViewController {
                                                      duration: 8.0)
         let earthRotateForever = SCNAction.repeatForever(earthRotationAction)
         earth.runAction(earthRotateForever)
+        
+        let moonParent = SCNNode()
+        moonParent.position = SCNVector3(0, 0, -0.5)
+        sceneView.scene.rootNode.addChildNode(moonParent)
+        let moonParentRotationAction = SCNAction.rotateBy(x: 0,
+                                                     y: CGFloat(360.degreesToRadians),
+                                                     z: 0,
+                                                     duration: 14.0)
+        let moonParentRotateForever = SCNAction.repeatForever(moonParentRotationAction)
+        moonParent.runAction(moonParentRotateForever)
+        
+        let moon = SCNNode()
+        moon.geometry = SCNSphere(radius: moonRadiusKM * scale)
+        moon.geometry?.firstMaterial?.diffuse.contents = #imageLiteral(resourceName: "moon")
+        moon.position = SCNVector3(0, 0, earthMoonDistance * scale)
+        moonParent.addChildNode(moon)
     }
     
     @IBAction func pressedFireMeteor(_ sender: Any) {
+        guard let pointOfView = sceneView.pointOfView else { return }
+        let transform = pointOfView.transform
+        let orientation = SCNVector3(-transform.m31, -transform.m32, -transform.m33)
+        let location = SCNVector3(transform.m41, transform.m42, transform.m43)
+        
+        let meteor = SCNNode()
+        meteor.geometry = SCNSphere(radius: 0.1)
+        meteor.geometry?.firstMaterial?.diffuse.contents = #imageLiteral(resourceName: "meteor")
+        meteor.position = location
+        
+        meteor.physicsBody = SCNPhysicsBody(type: SCNPhysicsBodyType.dynamic, shape: SCNPhysicsShape(node: meteor, options: nil))
+        meteor.physicsBody?.isAffectedByGravity = false
+        let power: Float = 0.7
+        meteor.physicsBody?.applyForce(SCNVector3(orientation.x * power, orientation.y * power, orientation.z * power), asImpulse: true)
+        
+        sceneView.scene.rootNode.addChildNode(meteor)
     }
     
 }
@@ -54,5 +94,9 @@ extension Int {
     var degreesToRadians: Double {
         return Double(self) * .pi / 180.0
     }
+}
+
+func +(left: SCNVector3, right: SCNVector3) -> SCNVector3 {
+    return SCNVector3Make(left.x + right.x, left.y + right.y, left.z + right.z)
 }
 
